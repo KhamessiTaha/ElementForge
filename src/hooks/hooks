@@ -1,0 +1,62 @@
+import { useState, useEffect, useCallback } from 'react';
+import { Particle, ParticleType, PARTICLE_PROPERTIES } from '../engine/ParticleTypes';
+import { Physics } from '../engine/Physics';
+import { Renderer } from '../engine/Renderer';
+
+export const useParticleSystem = (width: number, height: number) => {
+  const [particles, setParticles] = useState<Particle[]>([]);
+  const [grid, setGrid] = useState<(Particle | null)[][]>([]);
+  const [physics] = useState(new Physics(width, height));
+  const [renderer] = useState(new Renderer(width, height));
+
+  // Initialize grid
+  useEffect(() => {
+    const newGrid = Array(height).fill(null).map(() => Array(width).fill(null));
+    setGrid(newGrid);
+  }, [width, height]);
+
+  const addParticle = useCallback((x: number, y: number, type: ParticleType) => {
+    if (x < 0 || x >= width || y < 0 || y >= height) return;
+    
+    const props = PARTICLE_PROPERTIES[type];
+    const particle: Particle = {
+      type,
+      x: Math.floor(x),
+      y: Math.floor(y),
+      vx: 0,
+      vy: 0,
+      temperature: type === ParticleType.FIRE ? 1000 : 20,
+      life: type === ParticleType.FIRE ? Math.random() * 100 + 50 : Infinity,
+      color: props.color,
+      updated: false
+    };
+    
+    setParticles(prev => [...prev, particle]);
+    grid[y][x] = particle;
+  }, [grid, width, height]);
+
+  const removeParticle = useCallback((x: number, y: number) => {
+    if (x < 0 || x >= width || y < 0 || y >= height) return;
+    setParticles(prev => prev.filter(p => p.x !== x || p.y !== y));
+    grid[y][x] = null;
+  }, [grid, width, height]);
+
+  const update = useCallback(() => {
+    const { updatedParticles, updatedGrid } = physics.update(particles, grid);
+    setParticles(updatedParticles);
+    setGrid(updatedGrid);
+  }, [particles, grid, physics]);
+
+  const render = useCallback((ctx: CanvasRenderingContext2D) => {
+    renderer.render(ctx, particles);
+  }, [particles, renderer]);
+
+  return {
+    particles,
+    grid,
+    addParticle,
+    removeParticle,
+    update,
+    render
+  };
+};
